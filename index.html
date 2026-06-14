@@ -1,0 +1,2244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>myPKA Cockpit — Stephen Tassell</title>
+<!-- PWA -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0d0d1a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="myPKA">
+<link rel="apple-touch-icon" href="icon-192.svg">
+<style>
+  /* ─────────────────────────────────────────────
+     DESIGN NOTE (Charta, 2026-06-14):
+     GL-003 §2 Color palette is populated for the
+     Lexuria PDF publishing brand (deep navy +
+     warm amber, light backgrounds). This dashboard
+     requires a dark terminal cockpit aesthetic per
+     the task brief, which overrides GL-003 for this
+     deliverable. If Iris later authors a §11 Dashboard
+     / Dark-mode palette, re-render against those tokens.
+     Currently operating in flagged alternate-mode.
+  ─────────────────────────────────────────────── */
+
+  /* ── CSS CUSTOM PROPERTIES (dashboard palette) ── */
+  :root {
+    /* Backgrounds */
+    --bg-shell:       #0d0d1a;
+    --bg-sidebar:     #13132a;
+    --bg-panel:       #1a1a2e;
+    --bg-card:        #1e1e38;
+    --bg-card-hover:  #252545;
+    --bg-tab-active:  #1a1a2e;
+    --bg-tab-idle:    #0f0f22;
+    --bg-terminal:    #090912;
+    --bg-input:       #111128;
+
+    /* Borders */
+    --border-subtle:  #2a2a4a;
+    --border-accent:  #00b4d8;
+    --border-mid:     #333360;
+
+    /* Text */
+    --text-primary:   #e8e8f5;
+    --text-secondary: #9090b8;
+    --text-muted:     #5a5a80;
+    --text-accent:    #00b4d8;
+    --text-heading:   #ffffff;
+    --text-mono:      #7fdbff;
+
+    /* Accents */
+    --accent:         #00b4d8;
+    --accent-dim:     rgba(0, 180, 216, 0.15);
+    --accent-glow:    rgba(0, 180, 216, 0.08);
+    --green:          #22c55e;
+    --green-dim:      rgba(34, 197, 94, 0.15);
+    --amber:          #f59e0b;
+    --amber-dim:      rgba(245, 158, 11, 0.15);
+    --red:            #ef4444;
+
+    /* Spacing (8px base — matches GL-003 §4) */
+    --space-xs:   8px;
+    --space-sm:   16px;
+    --space-md:   24px;
+    --space-lg:   32px;
+    --space-xl:   48px;
+
+    /* Radii (corner-radius scale — no pills) */
+    --radius-sm:  4px;
+    --radius-md:  8px;
+    --radius-lg:  12px;
+
+    /* Typography */
+    --font-sans:  system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+    --font-mono:  "JetBrains Mono", "Fira Code", "Cascadia Code", "Courier New", monospace;
+
+    /* Layout dimensions */
+    --sidebar-width:    260px;
+    --sidebar-collapsed: 0px;
+    --terminal-height:  200px;
+    --header-height:    48px;
+    --tab-height:       40px;
+  }
+
+  /* ── RESET ── */
+  *, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  html, body {
+    height: 100%;
+    overflow: hidden;
+    background: var(--bg-shell);
+    color: var(--text-primary);
+    font-family: var(--font-sans);
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  /* ── SHELL ── */
+  .shell {
+    display: grid;
+    grid-template-rows: var(--header-height) 1fr;
+    grid-template-columns: var(--sidebar-width) 1fr;
+    grid-template-areas:
+      "header  header"
+      "sidebar main";
+    height: 100vh;
+    position: relative;
+    transition: grid-template-columns 0.25s ease;
+  }
+
+  .shell.sidebar-collapsed {
+    grid-template-columns: 0px 1fr;
+  }
+
+  /* ── HEADER ── */
+  .header {
+    grid-area: header;
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: 0 var(--space-sm);
+    background: var(--bg-shell);
+    border-bottom: 1px solid var(--border-subtle);
+    z-index: 20;
+    flex-shrink: 0;
+  }
+
+  .header-toggle {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: var(--radius-sm);
+    transition: background 0.15s, color 0.15s;
+    flex-shrink: 0;
+  }
+
+  .header-toggle:hover {
+    background: var(--accent-dim);
+    color: var(--accent);
+  }
+
+  .header-logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+  }
+
+  .header-logo .logo-mark {
+    width: 28px;
+    height: 28px;
+    background: var(--accent);
+    border-radius: var(--radius-sm);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--bg-shell);
+    font-family: var(--font-mono);
+  }
+
+  .header-logo .logo-text {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text-heading);
+    letter-spacing: 0.02em;
+  }
+
+  .header-logo .logo-sub {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+  }
+
+  .header-breadcrumb {
+    flex: 1;
+    font-size: 12px;
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .header-breadcrumb span {
+    color: var(--text-secondary);
+  }
+
+  .header-breadcrumb .crumb-sep {
+    margin: 0 6px;
+    color: var(--text-muted);
+  }
+
+  .header-meta {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    flex-shrink: 0;
+  }
+
+  .header-date {
+    font-size: 12px;
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+  }
+
+  .header-status {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--green);
+    font-family: var(--font-mono);
+  }
+
+  .header-status::before {
+    content: '';
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    background: var(--green);
+    border-radius: 50%;
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  /* ── SIDEBAR ── */
+  .sidebar {
+    grid-area: sidebar;
+    background: var(--bg-sidebar);
+    border-right: 1px solid var(--border-subtle);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    transition: width 0.25s ease;
+    z-index: 10;
+  }
+
+  .sidebar-scroll {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: var(--space-xs) 0;
+  }
+
+  .sidebar-scroll::-webkit-scrollbar {
+    width: 4px;
+  }
+
+  .sidebar-scroll::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .sidebar-scroll::-webkit-scrollbar-thumb {
+    background: var(--border-mid);
+    border-radius: 2px;
+  }
+
+  /* Sidebar tree */
+  .tree-section {
+    margin-bottom: 4px;
+  }
+
+  .tree-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px var(--space-sm);
+    cursor: pointer;
+    color: var(--text-muted);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    user-select: none;
+    transition: color 0.15s;
+    white-space: nowrap;
+  }
+
+  .tree-header:hover {
+    color: var(--text-secondary);
+  }
+
+  .tree-header .tree-chevron {
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+    transition: transform 0.2s;
+    color: var(--text-muted);
+  }
+
+  .tree-header.open .tree-chevron {
+    transform: rotate(90deg);
+  }
+
+  .tree-children {
+    overflow: hidden;
+    max-height: 0;
+    transition: max-height 0.25s ease;
+  }
+
+  .tree-children.open {
+    max-height: 800px;
+  }
+
+  .tree-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px var(--space-sm) 5px calc(var(--space-sm) + 16px);
+    cursor: pointer;
+    color: var(--text-secondary);
+    font-size: 13px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    border-left: 2px solid transparent;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+    user-select: none;
+  }
+
+  .tree-item:hover {
+    background: var(--accent-glow);
+    color: var(--text-primary);
+    border-left-color: var(--border-mid);
+  }
+
+  .tree-item.active {
+    background: var(--accent-dim);
+    color: var(--accent);
+    border-left-color: var(--accent);
+  }
+
+  .tree-item .item-icon {
+    flex-shrink: 0;
+    width: 14px;
+    height: 14px;
+    opacity: 0.7;
+  }
+
+  /* Sub-tree (nested) */
+  .tree-sub-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px var(--space-sm) 5px calc(var(--space-sm) + 8px);
+    cursor: pointer;
+    color: var(--text-secondary);
+    font-size: 13px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    transition: background 0.15s, color 0.15s;
+    user-select: none;
+  }
+
+  .tree-sub-header:hover {
+    background: var(--accent-glow);
+    color: var(--text-primary);
+  }
+
+  .tree-sub-header .tree-chevron {
+    width: 12px;
+    height: 12px;
+    flex-shrink: 0;
+    transition: transform 0.2s;
+    opacity: 0.6;
+  }
+
+  .tree-sub-header.open .tree-chevron {
+    transform: rotate(90deg);
+  }
+
+  .tree-sub-children {
+    overflow: hidden;
+    max-height: 0;
+    transition: max-height 0.2s ease;
+  }
+
+  .tree-sub-children.open {
+    max-height: 400px;
+  }
+
+  .tree-leaf {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px var(--space-sm) 4px calc(var(--space-sm) + 36px);
+    cursor: pointer;
+    color: var(--text-muted);
+    font-size: 12px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    border-left: 2px solid transparent;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+    user-select: none;
+  }
+
+  .tree-leaf:hover {
+    background: var(--accent-glow);
+    color: var(--text-secondary);
+    border-left-color: var(--border-mid);
+  }
+
+  .tree-leaf.active {
+    background: var(--accent-dim);
+    color: var(--accent);
+    border-left-color: var(--accent);
+  }
+
+  /* Agent status widget */
+  .agent-panel {
+    border-top: 1px solid var(--border-subtle);
+    padding: var(--space-xs) var(--space-sm) var(--space-sm);
+    flex-shrink: 0;
+  }
+
+  .agent-panel-title {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+    padding-top: 8px;
+  }
+
+  .agent-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .agent-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 6px;
+    border-radius: var(--radius-sm);
+    transition: background 0.15s;
+    cursor: default;
+  }
+
+  .agent-item:hover {
+    background: var(--accent-glow);
+  }
+
+  .agent-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--green);
+    flex-shrink: 0;
+    box-shadow: 0 0 4px var(--green);
+  }
+
+  .agent-name {
+    font-size: 12px;
+    color: var(--text-secondary);
+    font-weight: 500;
+    flex: 1;
+    white-space: nowrap;
+  }
+
+  .agent-role {
+    font-size: 10px;
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+    white-space: nowrap;
+  }
+
+  /* ── MAIN AREA ── */
+  .main {
+    grid-area: main;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: var(--bg-panel);
+  }
+
+  /* Tab strip */
+  .tab-strip {
+    display: flex;
+    align-items: center;
+    height: var(--tab-height);
+    background: var(--bg-shell);
+    border-bottom: 1px solid var(--border-subtle);
+    padding: 0 var(--space-sm);
+    gap: 4px;
+    flex-shrink: 0;
+  }
+
+  .tab {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 var(--space-sm);
+    height: 30px;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-muted);
+    background: var(--bg-tab-idle);
+    border: 1px solid transparent;
+    transition: all 0.15s;
+    user-select: none;
+  }
+
+  .tab:hover {
+    color: var(--text-secondary);
+    background: var(--bg-card);
+  }
+
+  .tab.active {
+    color: var(--accent);
+    background: var(--accent-dim);
+    border-color: var(--border-accent);
+  }
+
+  .tab-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--text-muted);
+  }
+
+  .tab.active .tab-dot {
+    background: var(--accent);
+  }
+
+  .tab-spacer {
+    flex: 1;
+  }
+
+  .tab-action {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 12px;
+    height: 28px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--bg-shell);
+    background: var(--accent);
+    border: none;
+    transition: opacity 0.15s;
+    font-family: var(--font-sans);
+  }
+
+  .tab-action:hover {
+    opacity: 0.85;
+  }
+
+  /* Content area */
+  .content-area {
+    flex: 1;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .content-scroll {
+    flex: 1;
+    overflow-y: auto;
+    padding: var(--space-md);
+  }
+
+  .content-scroll::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .content-scroll::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .content-scroll::-webkit-scrollbar-thumb {
+    background: var(--border-mid);
+    border-radius: 3px;
+  }
+
+  /* ── HOME VIEW ── */
+  .home-view {
+    display: block;
+  }
+
+  .home-view.hidden {
+    display: none;
+  }
+
+  .home-header {
+    margin-bottom: var(--space-md);
+  }
+
+  .home-title {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--text-heading);
+    margin-bottom: 4px;
+  }
+
+  .home-subtitle {
+    font-size: 13px;
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+  }
+
+  .widget-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: auto auto;
+    gap: var(--space-md);
+  }
+
+  /* Widget cards */
+  .widget {
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    transition: border-color 0.2s;
+  }
+
+  .widget:hover {
+    border-color: var(--border-mid);
+  }
+
+  .widget-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-sm) var(--space-sm) 12px;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+
+  .widget-title-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .widget-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: var(--radius-md);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .widget-icon.journal  { background: rgba(139, 92, 246, 0.2); color: #a78bfa; }
+  .widget-icon.goals    { background: rgba(34, 197, 94, 0.15); color: #22c55e; }
+  .widget-icon.projects { background: rgba(0, 180, 216, 0.15); color: #00b4d8; }
+  .widget-icon.habits   { background: rgba(245, 158, 11, 0.15); color: #f59e0b; }
+
+  .widget-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  .widget-date {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+  }
+
+  .widget-badge {
+    font-size: 10px;
+    font-weight: 600;
+    padding: 3px 8px;
+    border-radius: var(--radius-sm);
+    background: var(--accent-dim);
+    color: var(--accent);
+    font-family: var(--font-mono);
+    letter-spacing: 0.05em;
+  }
+
+  .widget-badge.green  { background: var(--green-dim);  color: var(--green); }
+  .widget-badge.amber  { background: var(--amber-dim);  color: var(--amber); }
+
+  .widget-body {
+    padding: var(--space-sm);
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  /* Journal widget */
+  .journal-entry {
+    flex: 1;
+  }
+
+  .journal-date-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: var(--radius-sm);
+    background: rgba(139, 92, 246, 0.12);
+    border: 1px solid rgba(139, 92, 246, 0.25);
+    color: #a78bfa;
+    font-size: 11px;
+    font-family: var(--font-mono);
+    margin-bottom: 10px;
+  }
+
+  .journal-prompt {
+    font-size: 13px;
+    color: var(--text-secondary);
+    line-height: 1.6;
+    margin-bottom: 12px;
+  }
+
+  .journal-textarea {
+    width: 100%;
+    min-height: 80px;
+    background: var(--bg-input);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    padding: 10px 12px;
+    color: var(--text-primary);
+    font-size: 13px;
+    font-family: var(--font-sans);
+    resize: vertical;
+    line-height: 1.6;
+    transition: border-color 0.15s;
+    outline: none;
+  }
+
+  .journal-textarea:focus {
+    border-color: var(--border-accent);
+  }
+
+  .journal-textarea::placeholder {
+    color: var(--text-muted);
+  }
+
+  /* Goal rows */
+  .goal-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+
+  .goal-item:last-child {
+    border-bottom: none;
+  }
+
+  .goal-check {
+    width: 18px;
+    height: 18px;
+    border-radius: var(--radius-sm);
+    border: 1.5px solid var(--border-mid);
+    flex-shrink: 0;
+    margin-top: 2px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+  }
+
+  .goal-check:hover {
+    border-color: var(--green);
+  }
+
+  .goal-check.done {
+    background: var(--green-dim);
+    border-color: var(--green);
+  }
+
+  .goal-check.done::after {
+    content: '';
+    display: block;
+    width: 10px;
+    height: 6px;
+    border-left: 2px solid var(--green);
+    border-bottom: 2px solid var(--green);
+    transform: translateY(-1px) rotate(-45deg);
+  }
+
+  .goal-text {
+    flex: 1;
+  }
+
+  .goal-label {
+    font-size: 13px;
+    color: var(--text-primary);
+    font-weight: 500;
+    line-height: 1.4;
+    margin-bottom: 3px;
+  }
+
+  .goal-meta {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+  }
+
+  .goal-progress {
+    margin-top: 4px;
+    height: 3px;
+    background: var(--border-subtle);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .goal-progress-fill {
+    height: 100%;
+    border-radius: 2px;
+    background: var(--green);
+    transition: width 0.4s ease;
+  }
+
+  /* Project rows */
+  .project-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border-subtle);
+    cursor: pointer;
+    transition: opacity 0.15s;
+  }
+
+  .project-item:last-child {
+    border-bottom: none;
+  }
+
+  .project-item:hover {
+    opacity: 0.85;
+  }
+
+  .project-color {
+    width: 4px;
+    height: 36px;
+    border-radius: 2px;
+    flex-shrink: 0;
+  }
+
+  .project-info {
+    flex: 1;
+  }
+
+  .project-name {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-primary);
+    margin-bottom: 3px;
+  }
+
+  .project-status {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+  }
+
+  .project-tag {
+    font-size: 10px;
+    font-weight: 600;
+    padding: 2px 7px;
+    border-radius: var(--radius-sm);
+    font-family: var(--font-mono);
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+  }
+
+  .project-tag.active   { background: var(--accent-dim);  color: var(--accent); }
+  .project-tag.hot      { background: rgba(239,68,68,0.15); color: #f87171; }
+  .project-tag.pending  { background: var(--amber-dim);   color: var(--amber); }
+
+  /* Habit rows */
+  .habit-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+
+  .habit-item:last-child {
+    border-bottom: none;
+  }
+
+  .habit-icon-wrap {
+    width: 32px;
+    height: 32px;
+    border-radius: var(--radius-md);
+    background: var(--amber-dim);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    font-size: 14px;
+  }
+
+  .habit-info {
+    flex: 1;
+  }
+
+  .habit-name {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-primary);
+    margin-bottom: 2px;
+  }
+
+  .habit-time {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+  }
+
+  .habit-streak {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+  }
+
+  .habit-streak-count {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--amber);
+    font-family: var(--font-mono);
+    line-height: 1;
+  }
+
+  .habit-streak-label {
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+  }
+
+  /* Habit dots */
+  .habit-dots {
+    display: flex;
+    gap: 4px;
+    margin-top: 4px;
+  }
+
+  .habit-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--border-mid);
+  }
+
+  .habit-dot.done {
+    background: var(--amber);
+  }
+
+  /* ── FILE VIEW ── */
+  .file-view {
+    display: none;
+    flex-direction: column;
+    height: 100%;
+  }
+
+  .file-view.visible {
+    display: flex;
+  }
+
+  .file-view-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 0 var(--space-sm);
+    border-bottom: 1px solid var(--border-subtle);
+    margin-bottom: var(--space-sm);
+    flex-shrink: 0;
+  }
+
+  .file-view-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .file-view-path {
+    font-size: 12px;
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+  }
+
+  .file-view-name {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text-heading);
+  }
+
+  .file-view-actions {
+    display: flex;
+    gap: 8px;
+  }
+
+  .btn-ghost {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 12px;
+    height: 30px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    font-size: 12px;
+    color: var(--text-secondary);
+    background: transparent;
+    border: 1px solid var(--border-mid);
+    transition: all 0.15s;
+    font-family: var(--font-sans);
+  }
+
+  .btn-ghost:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: var(--accent-dim);
+  }
+
+  .file-editor {
+    flex: 1;
+    background: var(--bg-input);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    padding: var(--space-md);
+    color: var(--text-primary);
+    font-size: 13px;
+    font-family: var(--font-mono);
+    resize: none;
+    line-height: 1.7;
+    outline: none;
+    transition: border-color 0.15s;
+    height: 100%;
+    min-height: 300px;
+  }
+
+  .file-editor:focus {
+    border-color: var(--border-accent);
+  }
+
+  /* ── TERMINAL DRAWER ── */
+  .terminal-drawer {
+    background: var(--bg-shell);
+    border-top: 1px solid var(--border-subtle);
+    flex-shrink: 0;
+    overflow: hidden;
+    transition: height 0.25s ease;
+    height: 0;
+  }
+
+  .terminal-drawer.open {
+    height: var(--terminal-height);
+  }
+
+  .terminal-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 var(--space-sm);
+    height: 36px;
+    background: var(--bg-terminal);
+    border-top: 1px solid var(--border-subtle);
+    cursor: pointer;
+    flex-shrink: 0;
+    user-select: none;
+  }
+
+  .terminal-bar:hover {
+    background: var(--bg-input);
+  }
+
+  .terminal-bar-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .terminal-dots {
+    display: flex;
+    gap: 5px;
+  }
+
+  .t-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+  }
+
+  .t-dot.red    { background: #ff5f57; }
+  .t-dot.amber  { background: #febc2e; }
+  .t-dot.green  { background: #28c840; }
+
+  .terminal-label {
+    font-size: 12px;
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+    letter-spacing: 0.05em;
+  }
+
+  .terminal-toggle-icon {
+    color: var(--text-muted);
+    width: 16px;
+    height: 16px;
+    transition: transform 0.25s;
+  }
+
+  .terminal-drawer.open .terminal-toggle-icon {
+    transform: rotate(180deg);
+  }
+
+  .terminal-content {
+    height: calc(var(--terminal-height) - 36px);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .terminal-output {
+    flex: 1;
+    overflow-y: auto;
+    padding: var(--space-xs) var(--space-sm);
+    font-size: 12px;
+    font-family: var(--font-mono);
+    color: #7fdbff;
+    line-height: 1.7;
+    background: var(--bg-terminal);
+  }
+
+  .terminal-output::-webkit-scrollbar {
+    width: 4px;
+  }
+
+  .terminal-output::-webkit-scrollbar-thumb {
+    background: var(--border-mid);
+    border-radius: 2px;
+  }
+
+  .t-line-dim    { color: var(--text-muted); }
+  .t-line-green  { color: var(--green); }
+  .t-line-amber  { color: var(--amber); }
+  .t-line-accent { color: var(--accent); }
+
+  .terminal-input-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 var(--space-sm);
+    height: 36px;
+    background: var(--bg-terminal);
+    border-top: 1px solid var(--border-subtle);
+    flex-shrink: 0;
+  }
+
+  .terminal-prompt {
+    color: var(--green);
+    font-size: 12px;
+    font-family: var(--font-mono);
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .terminal-input {
+    flex: 1;
+    background: none;
+    border: none;
+    outline: none;
+    color: var(--text-mono);
+    font-size: 12px;
+    font-family: var(--font-mono);
+    caret-color: var(--accent);
+  }
+
+  .terminal-input::placeholder {
+    color: var(--text-muted);
+  }
+
+  /* ── UTILITY ── */
+  .hidden { display: none !important; }
+
+  /* Scrollbar for content */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-mid) transparent;
+  }
+
+  /* SVG icons (inline) */
+  .icon {
+    display: inline-block;
+    vertical-align: middle;
+    flex-shrink: 0;
+  }
+</style>
+</head>
+<body>
+
+<div class="shell" id="shell">
+
+  <!-- ══════════════════════════════════════
+       HEADER
+  ══════════════════════════════════════ -->
+  <header class="header">
+    <button class="header-toggle" id="sidebarToggle" title="Toggle sidebar" aria-label="Toggle sidebar">
+      <svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+      </svg>
+    </button>
+
+    <div class="header-logo">
+      <div class="logo-mark">mP</div>
+      <div>
+        <div class="logo-text">myPKA Cockpit</div>
+        <div class="logo-sub">Stephen Tassell · ICOR</div>
+      </div>
+    </div>
+
+    <div class="header-breadcrumb" id="headerBreadcrumb">
+      <span>Home</span>
+    </div>
+
+    <div class="header-meta">
+      <div class="header-date" id="headerDate">14 June 2026</div>
+      <div class="header-status">System active</div>
+    </div>
+  </header>
+
+  <!-- ══════════════════════════════════════
+       SIDEBAR
+  ══════════════════════════════════════ -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-scroll">
+
+      <!-- TEAM/ -->
+      <div class="tree-section">
+        <div class="tree-header open" onclick="toggleTree(this)">
+          <svg class="tree-chevron icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <polyline points="9 18 15 12 9 6"/>
+          </svg>
+          <svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+          </svg>
+          Team/
+        </div>
+        <div class="tree-children open">
+          <div class="tree-item" onclick="openFile('Team/Claudia', 'Claudia — Orchestrator', this)">
+            <svg class="item-icon icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+            </svg>
+            Claudia
+          </div>
+          <div class="tree-item" onclick="openFile('Team/Penn', 'Penn — Journal Writer', this)">
+            <svg class="item-icon icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+            </svg>
+            Penn
+          </div>
+          <div class="tree-item" onclick="openFile('Team/Pax', 'Pax — Research Specialist', this)">
+            <svg class="item-icon icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+            </svg>
+            Pax
+          </div>
+          <div class="tree-item" onclick="openFile('Team/Nolan', 'Nolan — HR Specialist', this)">
+            <svg class="item-icon icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+            </svg>
+            Nolan
+          </div>
+          <div class="tree-item" onclick="openFile('Team/Mack', 'Mack — Systems Engineer', this)">
+            <svg class="item-icon icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+            </svg>
+            Mack
+          </div>
+          <div class="tree-item" onclick="openFile('Team/Silas', 'Silas — Data Architect', this)">
+            <svg class="item-icon icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+            </svg>
+            Silas
+          </div>
+          <div class="tree-item" onclick="openFile('Team/Charta', 'Charta — Infographic Designer', this)">
+            <svg class="item-icon icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+            </svg>
+            Charta
+          </div>
+          <div class="tree-item" onclick="openFile('Team/Pixel', 'Pixel — Visual Designer', this)">
+            <svg class="item-icon icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+            </svg>
+            Pixel
+          </div>
+          <div class="tree-item" onclick="openFile('Team/Iris', 'Iris — Design System Architect', this)">
+            <svg class="item-icon icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+            </svg>
+            Iris
+          </div>
+        </div>
+      </div>
+
+      <!-- TEAM KNOWLEDGE/ -->
+      <div class="tree-section">
+        <div class="tree-header" onclick="toggleTree(this)">
+          <svg class="tree-chevron icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <polyline points="9 18 15 12 9 6"/>
+          </svg>
+          <svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>
+          </svg>
+          Team Knowledge/
+        </div>
+        <div class="tree-children">
+          <div class="tree-item" onclick="openFile('Team Knowledge/SOPs', 'SOPs', this)">
+            <svg class="item-icon icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>
+            </svg>
+            SOPs/
+          </div>
+          <div class="tree-item" onclick="openFile('Team Knowledge/Workstreams', 'Workstreams', this)">
+            <svg class="item-icon icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>
+            </svg>
+            Workstreams/
+          </div>
+          <div class="tree-item" onclick="openFile('Team Knowledge/Guidelines', 'Guidelines', this)">
+            <svg class="item-icon icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>
+            </svg>
+            Guidelines/
+          </div>
+          <div class="tree-item" onclick="openFile('Team Knowledge/session-logs', 'Session Logs', this)">
+            <svg class="item-icon icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>
+            </svg>
+            session-logs/
+          </div>
+        </div>
+      </div>
+
+      <!-- PKM/ -->
+      <div class="tree-section">
+        <div class="tree-header open" onclick="toggleTree(this)">
+          <svg class="tree-chevron icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <polyline points="9 18 15 12 9 6"/>
+          </svg>
+          <svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+          </svg>
+          PKM/
+        </div>
+        <div class="tree-children open">
+
+          <!-- My Life sub-tree -->
+          <div class="tree-sub-header open" onclick="toggleSubTree(this)">
+            <svg class="tree-chevron icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <polyline points="9 18 15 12 9 6"/>
+            </svg>
+            <svg class="icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+            </svg>
+            My Life/
+          </div>
+          <div class="tree-sub-children open">
+            <div class="tree-leaf" onclick="openFile('PKM/My Life/Topics', 'Topics', this)">
+              <svg class="icon" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M20 7H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>
+              </svg>
+              Topics/
+            </div>
+            <div class="tree-leaf" onclick="openFile('PKM/My Life/Habits', 'Habits', this)">
+              <svg class="icon" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+              </svg>
+              Habits/
+            </div>
+            <div class="tree-leaf" onclick="openFile('PKM/My Life/Goals', 'Goals', this)">
+              <svg class="icon" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>
+              </svg>
+              Goals/
+            </div>
+            <div class="tree-leaf" onclick="openFile('PKM/My Life/Projects', 'Projects', this)">
+              <svg class="icon" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
+              </svg>
+              Projects/
+            </div>
+            <div class="tree-leaf" onclick="openFile('PKM/My Life/Key Elements', 'Key Elements', this)">
+              <svg class="icon" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+              </svg>
+              Key Elements/
+            </div>
+          </div>
+
+          <div class="tree-item" onclick="openFile('PKM/Documents', 'Documents', this)">
+            <svg class="item-icon icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+            </svg>
+            Documents/
+          </div>
+
+          <!-- CRM sub-tree -->
+          <div class="tree-sub-header" onclick="toggleSubTree(this)">
+            <svg class="tree-chevron icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <polyline points="9 18 15 12 9 6"/>
+            </svg>
+            <svg class="icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+            </svg>
+            CRM/
+          </div>
+          <div class="tree-sub-children">
+            <div class="tree-leaf" onclick="openFile('PKM/CRM/People', 'People', this)">
+              <svg class="icon" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+              </svg>
+              People/
+            </div>
+            <div class="tree-leaf" onclick="openFile('PKM/CRM/Organizations', 'Organizations', this)">
+              <svg class="icon" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>
+              </svg>
+              Organizations/
+            </div>
+          </div>
+
+          <div class="tree-item" onclick="openFile('PKM/Images', 'Images', this)">
+            <svg class="item-icon icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/>
+            </svg>
+            Images/
+          </div>
+          <div class="tree-item" onclick="openFile('PKM/Journal', 'Journal', this)">
+            <svg class="item-icon icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
+            </svg>
+            Journal/
+          </div>
+        </div>
+      </div>
+
+      <!-- DELIVERABLES/ -->
+      <div class="tree-section">
+        <div class="tree-header" onclick="toggleTree(this)">
+          <svg class="tree-chevron icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <polyline points="9 18 15 12 9 6"/>
+          </svg>
+          <svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+          </svg>
+          Deliverables/
+        </div>
+        <div class="tree-children">
+          <div class="tree-item" onclick="openFile('Deliverables/2026-06-14', '2026-06-14-myicor-cockpit-dashboard.html', this)">
+            <svg class="item-icon icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>
+            </svg>
+            2026-06-14-myicor-cockpit-dashboard.html
+          </div>
+          <div class="tree-item" onclick="openFile('Deliverables/2026-06-14', '2026-06-14-myicor-dashboard-research.md', this)">
+            <svg class="item-icon icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>
+            </svg>
+            2026-06-14-myicor-dashboard-research.md
+          </div>
+        </div>
+      </div>
+
+      <!-- TEAM INBOX/ -->
+      <div class="tree-section">
+        <div class="tree-header" onclick="toggleTree(this)">
+          <svg class="tree-chevron icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <polyline points="9 18 15 12 9 6"/>
+          </svg>
+          <svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>
+          </svg>
+          Team Inbox/
+        </div>
+        <div class="tree-children">
+          <div class="tree-item" onclick="openFile('Team Inbox', 'No items — inbox clear', this)">
+            <svg class="item-icon icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+              <polyline points="22 4 12 14.01 9 11.01"/>
+            </svg>
+            Inbox clear
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /sidebar-scroll -->
+
+    <!-- Agent Status Panel -->
+    <div class="agent-panel">
+      <div class="agent-panel-title">Team Status</div>
+      <div class="agent-list">
+        <div class="agent-item">
+          <div class="agent-dot"></div>
+          <span class="agent-name">Claudia</span>
+          <span class="agent-role">orchestrator</span>
+        </div>
+        <div class="agent-item">
+          <div class="agent-dot"></div>
+          <span class="agent-name">Penn</span>
+          <span class="agent-role">journal</span>
+        </div>
+        <div class="agent-item">
+          <div class="agent-dot"></div>
+          <span class="agent-name">Pax</span>
+          <span class="agent-role">research</span>
+        </div>
+        <div class="agent-item">
+          <div class="agent-dot"></div>
+          <span class="agent-name">Nolan</span>
+          <span class="agent-role">hr</span>
+        </div>
+        <div class="agent-item">
+          <div class="agent-dot"></div>
+          <span class="agent-name">Mack</span>
+          <span class="agent-role">systems</span>
+        </div>
+        <div class="agent-item">
+          <div class="agent-dot"></div>
+          <span class="agent-name">Silas</span>
+          <span class="agent-role">data</span>
+        </div>
+        <div class="agent-item">
+          <div class="agent-dot"></div>
+          <span class="agent-name">Charta</span>
+          <span class="agent-role">design</span>
+        </div>
+        <div class="agent-item">
+          <div class="agent-dot"></div>
+          <span class="agent-name">Pixel</span>
+          <span class="agent-role">visual</span>
+        </div>
+        <div class="agent-item">
+          <div class="agent-dot"></div>
+          <span class="agent-name">Iris</span>
+          <span class="agent-role">brand</span>
+        </div>
+      </div>
+    </div>
+
+  </aside><!-- /sidebar -->
+
+  <!-- ══════════════════════════════════════
+       MAIN CONTENT AREA
+  ══════════════════════════════════════ -->
+  <main class="main">
+
+    <!-- Tab strip -->
+    <div class="tab-strip">
+      <div class="tab active" id="tab-personal" onclick="switchTab('personal')">
+        <span class="tab-dot"></span>
+        Personal
+      </div>
+      <div class="tab" id="tab-business" onclick="switchTab('business')">
+        <span class="tab-dot"></span>
+        Business
+      </div>
+      <div class="tab-spacer"></div>
+      <button class="tab-action" onclick="goHome()">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>
+        </svg>
+        Home
+      </button>
+    </div>
+
+    <!-- Content area -->
+    <div class="content-area">
+      <div class="content-scroll" id="contentScroll">
+
+        <!-- ── HOME VIEW ── -->
+        <div class="home-view" id="homeView">
+          <div class="home-header">
+            <div class="home-title">Good evening, Stephen.</div>
+            <div class="home-subtitle">Sunday · 14 June 2026 · myPKA ICOR Cockpit v1.0</div>
+          </div>
+
+          <div class="widget-grid">
+
+            <!-- Widget 1: Today's Journal -->
+            <div class="widget">
+              <div class="widget-header">
+                <div class="widget-title-row">
+                  <div class="widget-icon journal">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
+                    </svg>
+                  </div>
+                  <div>
+                    <div class="widget-title">Today's Journal</div>
+                  </div>
+                </div>
+                <div class="widget-date">14 Jun 2026</div>
+              </div>
+              <div class="widget-body">
+                <div class="journal-entry">
+                  <div class="journal-date-chip">
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+                    </svg>
+                    Sunday, 14 June 2026
+                  </div>
+                  <div class="journal-prompt">No entry yet today. What's on your mind? Dictate or type below — Penn will capture and cross-link it.</div>
+                  <textarea class="journal-textarea" placeholder="Start dictating or typing your daily update here…&#10;&#10;Prefix sections 'My dearest Regan' to route to Regan automatically."></textarea>
+                </div>
+              </div>
+            </div>
+
+            <!-- Widget 2: Active Goals -->
+            <div class="widget">
+              <div class="widget-header">
+                <div class="widget-title-row">
+                  <div class="widget-icon goals">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>
+                    </svg>
+                  </div>
+                  <div>
+                    <div class="widget-title">Active Goals</div>
+                  </div>
+                </div>
+                <div class="widget-badge green">3 active</div>
+              </div>
+              <div class="widget-body">
+
+                <div class="goal-item">
+                  <div class="goal-check" onclick="toggleCheck(this)"></div>
+                  <div class="goal-text">
+                    <div class="goal-label">Stop needing father's £300/month contribution</div>
+                    <div class="goal-meta">Milestone: First sale → first income stream</div>
+                    <div class="goal-progress">
+                      <div class="goal-progress-fill" style="width: 15%"></div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="goal-item">
+                  <div class="goal-check" onclick="toggleCheck(this)"></div>
+                  <div class="goal-text">
+                    <div class="goal-label">Pay full contractual mortgage + erode arrears</div>
+                    <div class="goal-meta">Linked: Lexuria PDF Business pipeline</div>
+                    <div class="goal-progress">
+                      <div class="goal-progress-fill" style="width: 10%"></div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="goal-item">
+                  <div class="goal-check" onclick="toggleCheck(this)"></div>
+                  <div class="goal-text">
+                    <div class="goal-label">June stretch: $10,000 Lexuria gross revenue</div>
+                    <div class="goal-meta">Deadline: 30 June 2026 · Baseline: $1,000</div>
+                    <div class="goal-progress">
+                      <div class="goal-progress-fill" style="width: 5%"></div>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+
+            <!-- Widget 3: Active Projects -->
+            <div class="widget">
+              <div class="widget-header">
+                <div class="widget-title-row">
+                  <div class="widget-icon projects">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
+                    </svg>
+                  </div>
+                  <div>
+                    <div class="widget-title">Active Projects</div>
+                  </div>
+                </div>
+                <div class="widget-badge">3 running</div>
+              </div>
+              <div class="widget-body">
+
+                <div class="project-item" onclick="openFile('PKM/My Life/Projects', 'lexuria-pdf-business', document.querySelector('.tree-leaf'))">
+                  <div class="project-color" style="background: #ef4444;"></div>
+                  <div class="project-info">
+                    <div class="project-name">Lexuria PDF Business Launch</div>
+                    <div class="project-status">Etsy + Gumroad · GLP-1 guide + AI Income Blueprint live</div>
+                  </div>
+                  <span class="project-tag hot">Priority 1</span>
+                </div>
+
+                <div class="project-item" onclick="openFile('PKM/My Life/Projects', 'github-vps-setup', document.querySelector('.tree-leaf'))">
+                  <div class="project-color" style="background: #00b4d8;"></div>
+                  <div class="project-info">
+                    <div class="project-name">VPS + GitHub Setup</div>
+                    <div class="project-status">Hetzner CX32 · three-way sync · cron batch ingestion</div>
+                  </div>
+                  <span class="project-tag active">Active</span>
+                </div>
+
+                <div class="project-item" onclick="openFile('PKM/My Life/Projects', 'lifeos-migration', document.querySelector('.tree-leaf'))">
+                  <div class="project-color" style="background: #f59e0b;"></div>
+                  <div class="project-info">
+                    <div class="project-name">LifeOS Migration</div>
+                    <div class="project-status">Regan / Connie / Vikki / Sarah / Athena → myPKA</div>
+                  </div>
+                  <span class="project-tag pending">Pending</span>
+                </div>
+
+              </div>
+            </div>
+
+            <!-- Widget 4: Habits Streak -->
+            <div class="widget">
+              <div class="widget-header">
+                <div class="widget-title-row">
+                  <div class="widget-icon habits">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+                    </svg>
+                  </div>
+                  <div>
+                    <div class="widget-title">Habits Streak</div>
+                  </div>
+                </div>
+                <div class="widget-badge amber">Last 7 days</div>
+              </div>
+              <div class="widget-body">
+
+                <div class="habit-item">
+                  <div class="habit-icon-wrap">&#x1F31E;</div>
+                  <div class="habit-info">
+                    <div class="habit-name">Morning Session</div>
+                    <div class="habit-time">09:00–12:00 BST</div>
+                    <div class="habit-dots">
+                      <div class="habit-dot done"></div>
+                      <div class="habit-dot done"></div>
+                      <div class="habit-dot done"></div>
+                      <div class="habit-dot done"></div>
+                      <div class="habit-dot done"></div>
+                      <div class="habit-dot"></div>
+                      <div class="habit-dot"></div>
+                    </div>
+                  </div>
+                  <div class="habit-streak">
+                    <div class="habit-streak-count">5</div>
+                    <div class="habit-streak-label">streak</div>
+                  </div>
+                </div>
+
+                <div class="habit-item">
+                  <div class="habit-icon-wrap">&#x1F3CA;</div>
+                  <div class="habit-info">
+                    <div class="habit-name">David Lloyd Daily</div>
+                    <div class="habit-time">Base infrastructure · broadband + shower</div>
+                    <div class="habit-dots">
+                      <div class="habit-dot done"></div>
+                      <div class="habit-dot done"></div>
+                      <div class="habit-dot done"></div>
+                      <div class="habit-dot done"></div>
+                      <div class="habit-dot done"></div>
+                      <div class="habit-dot done"></div>
+                      <div class="habit-dot done"></div>
+                    </div>
+                  </div>
+                  <div class="habit-streak">
+                    <div class="habit-streak-count">7</div>
+                    <div class="habit-streak-label">streak</div>
+                  </div>
+                </div>
+
+                <div class="habit-item">
+                  <div class="habit-icon-wrap">&#x1F319;</div>
+                  <div class="habit-info">
+                    <div class="habit-name">Evening Session</div>
+                    <div class="habit-time">18:00–22:00 BST</div>
+                    <div class="habit-dots">
+                      <div class="habit-dot done"></div>
+                      <div class="habit-dot done"></div>
+                      <div class="habit-dot done"></div>
+                      <div class="habit-dot done"></div>
+                      <div class="habit-dot"></div>
+                      <div class="habit-dot done"></div>
+                      <div class="habit-dot done"></div>
+                    </div>
+                  </div>
+                  <div class="habit-streak">
+                    <div class="habit-streak-count">6</div>
+                    <div class="habit-streak-label">streak</div>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+
+          </div><!-- /widget-grid -->
+        </div><!-- /home-view -->
+
+        <!-- ── FILE VIEW ── -->
+        <div class="file-view" id="fileView">
+          <div class="file-view-header">
+            <div class="file-view-title">
+              <div>
+                <div class="file-view-path" id="fileViewPath">PKM/</div>
+                <div class="file-view-name" id="fileViewName">Untitled</div>
+              </div>
+            </div>
+            <div class="file-view-actions">
+              <button class="btn-ghost" onclick="goHome()">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/>
+                </svg>
+                Back to Home
+              </button>
+              <button class="btn-ghost" id="copyPathBtn" onclick="copyPath()">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                </svg>
+                Copy path
+              </button>
+            </div>
+          </div>
+          <textarea class="file-editor" id="fileEditor" spellcheck="false"></textarea>
+        </div>
+
+      </div><!-- /content-scroll -->
+    </div><!-- /content-area -->
+
+    <!-- Terminal drawer (drawn inside main, below content-area) -->
+    <div class="terminal-drawer" id="terminalDrawer">
+      <div class="terminal-content">
+        <div class="terminal-output" id="terminalOutput">
+          <div class="t-line-dim">myPKA Cockpit Terminal — v1.0.0 (2026-06-14)</div>
+          <div class="t-line-dim">Type a command and press Enter. This is a simulation — no real shell connection.</div>
+          <div>&nbsp;</div>
+          <div><span class="t-line-green">stephen@mypka</span><span class="t-line-dim">:</span><span class="t-line-accent">~/Utopia</span><span class="t-line-dim">$</span> ls -1 Team/</div>
+          <div class="t-line-dim">Charta - Infographic Designer/</div>
+          <div class="t-line-dim">Claudia - Orchestrator/</div>
+          <div class="t-line-dim">Iris - Design System Architect/</div>
+          <div class="t-line-dim">Mack - Systems Engineer/</div>
+          <div class="t-line-dim">Nolan - HR Specialist/</div>
+          <div class="t-line-dim">Pax - Research Specialist/</div>
+          <div class="t-line-dim">Penn - Journal Writer/</div>
+          <div class="t-line-dim">Pixel - Visual Designer/</div>
+          <div class="t-line-dim">Silas - Data Architect/</div>
+          <div>&nbsp;</div>
+          <div><span class="t-line-green">stephen@mypka</span><span class="t-line-dim">:</span><span class="t-line-accent">~/Utopia</span><span class="t-line-dim">$</span> <span id="terminalCursor">&#x2588;</span></div>
+        </div>
+        <div class="terminal-input-row">
+          <span class="terminal-prompt">stephen@mypka:~/Utopia$</span>
+          <input class="terminal-input" id="terminalInput" type="text" placeholder="enter command…" autocomplete="off" spellcheck="false" onkeydown="handleTerminalInput(event)">
+        </div>
+      </div>
+    </div>
+
+  </main><!-- /main -->
+
+</div><!-- /shell -->
+
+<!-- Terminal toggle bar (sits outside main for z-index, appended dynamically) -->
+<div class="terminal-bar" id="terminalBar" onclick="toggleTerminal()">
+  <div class="terminal-bar-left">
+    <div class="terminal-dots">
+      <div class="t-dot red"></div>
+      <div class="t-dot amber"></div>
+      <div class="t-dot green"></div>
+    </div>
+    <span class="terminal-label">TERMINAL</span>
+  </div>
+  <svg class="terminal-toggle-icon icon" id="terminalIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+    <polyline points="18 15 12 9 6 15"/>
+  </svg>
+</div>
+
+<script>
+  // ─────────────────────────────────────────────
+  // STATE
+  // ─────────────────────────────────────────────
+  var state = {
+    sidebarOpen: true,
+    terminalOpen: false,
+    activeTab: 'personal',
+    currentFile: null,
+    currentPath: null,
+  };
+
+  // ─────────────────────────────────────────────
+  // INIT — wire up terminal bar position
+  // ─────────────────────────────────────────────
+  (function init() {
+    // Move terminal bar to bottom of main
+    var main = document.querySelector('.main');
+    var bar  = document.getElementById('terminalBar');
+    var drawer = document.getElementById('terminalDrawer');
+
+    // Insert terminal bar between content-area and terminal-drawer
+    main.insertBefore(bar, drawer);
+
+    // Update date
+    document.getElementById('headerDate').textContent = '14 June 2026';
+  })();
+
+  // ─────────────────────────────────────────────
+  // SIDEBAR TOGGLE
+  // ─────────────────────────────────────────────
+  document.getElementById('sidebarToggle').addEventListener('click', function() {
+    var shell = document.getElementById('shell');
+    state.sidebarOpen = !state.sidebarOpen;
+    if (state.sidebarOpen) {
+      shell.classList.remove('sidebar-collapsed');
+    } else {
+      shell.classList.add('sidebar-collapsed');
+    }
+  });
+
+  // ─────────────────────────────────────────────
+  // TREE TOGGLE
+  // ─────────────────────────────────────────────
+  function toggleTree(header) {
+    var children = header.nextElementSibling;
+    var isOpen = header.classList.contains('open');
+    if (isOpen) {
+      header.classList.remove('open');
+      children.classList.remove('open');
+    } else {
+      header.classList.add('open');
+      children.classList.add('open');
+    }
+  }
+
+  function toggleSubTree(header) {
+    var children = header.nextElementSibling;
+    var isOpen = header.classList.contains('open');
+    if (isOpen) {
+      header.classList.remove('open');
+      children.classList.remove('open');
+    } else {
+      header.classList.add('open');
+      children.classList.add('open');
+    }
+  }
+
+  // ─────────────────────────────────────────────
+  // FILE OPEN
+  // ─────────────────────────────────────────────
+  function openFile(path, name, el) {
+    // Clear existing active
+    document.querySelectorAll('.tree-item.active, .tree-leaf.active').forEach(function(n) {
+      n.classList.remove('active');
+    });
+    if (el && el.classList) {
+      el.classList.add('active');
+    }
+
+    state.currentPath = path;
+    state.currentFile = name;
+
+    // Switch views
+    document.getElementById('homeView').classList.add('hidden');
+    var fv = document.getElementById('fileView');
+    fv.classList.add('visible');
+
+    document.getElementById('fileViewPath').textContent = path + '/';
+    document.getElementById('fileViewName').textContent = name;
+
+    // Breadcrumb
+    document.getElementById('headerBreadcrumb').innerHTML =
+      '<span>Home</span><span class="crumb-sep">/</span><span>' +
+      path.replace(/\//g, '</span><span class="crumb-sep">/</span><span>') +
+      '</span><span class="crumb-sep">/</span><span style="color:var(--accent)">' + name + '</span>';
+
+    // Populate editor with placeholder
+    var placeholders = {
+      'Team/Claudia': '---\nname: Claudia\nrole: Orchestrator\nstatus: active\n---\n\n# Claudia — Orchestrator\n\nClaudia is the team orchestrator. She routes tasks to specialists, synthesises outputs, and maintains the myPKA system.\n\nSee AGENTS.md for the full contract.',
+      'Team/Penn': '---\nname: Penn\nrole: Journal Writer\nstatus: active\n---\n\n# Penn — Journal Writer\n\nPenn captures daily inputs, writes journal entries, and cross-links entities via wikilinks.\n\nSee Team/Penn - Journal Writer/AGENTS.md for the full contract.',
+      'Team/Pax': '---\nname: Pax\nrole: Research Specialist\nstatus: active\n---\n\n# Pax — Research Specialist\n\nPax runs web research, produces structured research briefs, and flags new entities for Penn to capture.\n\nSee Team/Pax - Research Specialist/AGENTS.md for the full contract.',
+      'PKM/Journal': '# Journal\n\nOne markdown file per day. Penn writes here when Stephen shares thoughts, screenshots, photos, or voice notes.\n\n## Recent entries\n\n- 2026-06-11 — Evening dictation: GP letter, David Lloyd spa, Jasmine, Angel booking, Lexuria domain registered\n- 2026-06-04 — David Lloyd session: guide uploads, Marker install, health positives, Compelling Future vision\n- 2026-06-03 — GP appointment: Dr. Cole, mortgage letter agreed\n- 2026-06-02 — Morning + Evening dictation',
+      'PKM/My Life/Goals': '# Goals\n\nActive goals tracked in myPKA.\n\n## Active\n\n1. **Stop needing father\'s £300/month contribution**\n   - Milestone ladder: First sale → First $100 → First $1,000 → Weekly pipeline\n   - Status: In progress\n\n2. **Pay full contractual mortgage + erode arrears**\n   - Linked project: Lexuria PDF Business\n   - Status: In progress\n\n3. **June stretch: $10,000 Lexuria gross revenue**\n   - Deadline: 30 June 2026\n   - Baseline: $1,000\n   - Status: In progress',
+      'PKM/My Life/Projects': '# Projects\n\nBounded efforts with a finish line.\n\n## Active\n\n### Lexuria PDF Business Launch\n- Status: Active — Priority 1\n- Guides live: GLP-1 Complete Guide, AI Income Blueprint\n- Pipeline: Etsy + Gumroad listings\n- Monthly rhythm: 6 days Lexuria / 1 day system maintenance\n\n### VPS + GitHub Setup\n- Status: Active\n- Platform: Hetzner CX32\n- Three-way sync model\n- Cron jobs for evening batch ingestion (Mack)\n\n### LifeOS Migration\n- Status: Pending (lower priority — business income first)\n- Agents to migrate: Regan, Connie, Vikki, Sarah, Athena',
+      'PKM/My Life/Habits': '# Habits\n\nRecurring rhythms.\n\n## Active habits\n\n### Morning Session\n- Time: 09:00–12:00 BST\n- Streak: 5 days\n\n### David Lloyd Daily\n- Purpose: Base infrastructure (broadband, charging, shower)\n- Streak: 7 days\n\n### Evening Session\n- Time: 18:00–22:00 BST\n- Streak: 6 days',
+    };
+
+    var content = placeholders[path + '/' + name] ||
+                  placeholders[path] ||
+                  '# ' + name + '\n\nPath: ' + path + '/\n\n---\n\n_This file exists in the myPKA scaffold. No content has been written here yet._\n\nTo populate this file, dictate to Claudia and Penn will capture it here automatically.';
+
+    document.getElementById('fileEditor').value = content;
+  }
+
+  // ─────────────────────────────────────────────
+  // GO HOME
+  // ─────────────────────────────────────────────
+  function goHome() {
+    document.getElementById('homeView').classList.remove('hidden');
+    document.getElementById('fileView').classList.remove('visible');
+
+    document.querySelectorAll('.tree-item.active, .tree-leaf.active').forEach(function(n) {
+      n.classList.remove('active');
+    });
+
+    document.getElementById('headerBreadcrumb').innerHTML = '<span>Home</span>';
+    state.currentFile = null;
+    state.currentPath = null;
+  }
+
+  // ─────────────────────────────────────────────
+  // TAB SWITCH
+  // ─────────────────────────────────────────────
+  function switchTab(tab) {
+    state.activeTab = tab;
+    document.querySelectorAll('.tab').forEach(function(t) {
+      t.classList.remove('active');
+    });
+    document.getElementById('tab-' + tab).classList.add('active');
+
+    // In a real build, this would filter sidebar and widget content.
+    // For this prototype, it updates the home greeting only.
+    var titleEl = document.querySelector('.home-title');
+    if (titleEl) {
+      if (tab === 'business') {
+        titleEl.textContent = 'Business view — Lexuria Publishing';
+      } else {
+        titleEl.textContent = 'Good evening, Stephen.';
+      }
+    }
+  }
+
+  // ─────────────────────────────────────────────
+  // TERMINAL
+  // ─────────────────────────────────────────────
+  function toggleTerminal() {
+    var drawer = document.getElementById('terminalDrawer');
+    var icon   = document.getElementById('terminalIcon');
+    state.terminalOpen = !state.terminalOpen;
+    if (state.terminalOpen) {
+      drawer.classList.add('open');
+      icon.style.transform = 'rotate(180deg)';
+      setTimeout(function() {
+        document.getElementById('terminalInput').focus();
+      }, 300);
+    } else {
+      drawer.classList.remove('open');
+      icon.style.transform = '';
+    }
+  }
+
+  var terminalHistory = [];
+  var historyIndex = -1;
+
+  var terminalCommands = {
+    'help': function() {
+      return [
+        '<span class="t-line-accent">Available commands (simulation only):</span>',
+        '  ls [path]     — list directory contents',
+        '  pwd           — print working directory',
+        '  cat [file]    — display file contents',
+        '  clear         — clear terminal',
+        '  agents        — list active team members',
+        '  date          — show current date/time',
+        '  status        — show system status',
+      ];
+    },
+    'pwd': function() { return ['<span class="t-line-dim">/home/Stephen/Utopia</span>']; },
+    'date': function() { return ['<span class="t-line-dim">Sun 14 Jun 2026 18:00:00 BST</span>']; },
+    'clear': function() {
+      document.getElementById('terminalOutput').innerHTML = '';
+      return [];
+    },
+    'agents': function() {
+      return [
+        '<span class="t-line-accent">myPKA Team (9 active agents):</span>',
+        '  <span class="t-line-green">●</span> Claudia   — Orchestrator',
+        '  <span class="t-line-green">●</span> Penn      — Journal Writer',
+        '  <span class="t-line-green">●</span> Pax       — Research Specialist',
+        '  <span class="t-line-green">●</span> Nolan     — HR Specialist',
+        '  <span class="t-line-green">●</span> Mack      — Systems Engineer',
+        '  <span class="t-line-green">●</span> Silas     — Data Architect',
+        '  <span class="t-line-green">●</span> Charta    — Infographic Designer',
+        '  <span class="t-line-green">●</span> Pixel     — Visual Designer',
+        '  <span class="t-line-green">●</span> Iris      — Design System Architect',
+      ];
+    },
+    'status': function() {
+      return [
+        '<span class="t-line-accent">myPKA System Status</span>',
+        '  Scaffold      : <span class="t-line-green">healthy</span>',
+        '  Journal       : 5 entries (2026/06)',
+        '  Deliverables  : 1 file (2026-06-14)',
+        '  Team          : 9 / 9 agents active',
+        '  Last sync     : 2026-06-14 18:00',
+        '  Git branch    : main (clean)',
+      ];
+    },
+    'ls': function(args) {
+      var path = args[1] || '.';
+      var dirs = {
+        '.': ['Team/', 'Team Knowledge/', 'PKM/', 'Deliverables/', 'Team Inbox/', 'AGENTS.md', 'CLAUDE.md'],
+        'Team/': ['Charta - Infographic Designer/', 'Claudia - Orchestrator/', 'Iris - Design System Architect/', 'Mack - Systems Engineer/', 'Nolan - HR Specialist/', 'Pax - Research Specialist/', 'Penn - Journal Writer/', 'Pixel - Visual Designer/', 'Silas - Data Architect/'],
+        'PKM/': ['CRM/', 'Documents/', 'Images/', 'Journal/', 'My Life/', 'INDEX.md'],
+        'Deliverables/': ['2026-06-14-myicor-cockpit-dashboard.html', '2026-06-14-myicor-dashboard-research.md'],
+      };
+      var listing = dirs[path] || dirs[path + '/'] || ['<span class="t-line-dim">No such directory: ' + path + '</span>'];
+      return listing.map(function(f) { return '<span class="t-line-dim">' + f + '</span>'; });
+    },
+  };
+
+  function handleTerminalInput(e) {
+    if (e.key === 'Enter') {
+      var input = document.getElementById('terminalInput');
+      var cmd = input.value.trim();
+      if (!cmd) return;
+
+      terminalHistory.unshift(cmd);
+      historyIndex = -1;
+      input.value = '';
+
+      appendTerminalLine(
+        '<span class="t-line-green">stephen@mypka</span><span class="t-line-dim">:</span><span class="t-line-accent">~/Utopia</span><span class="t-line-dim">$</span> ' + escapeHtml(cmd)
+      );
+
+      var parts = cmd.split(/\s+/);
+      var fn = terminalCommands[parts[0]];
+      if (fn) {
+        var lines = fn(parts);
+        lines.forEach(function(l) { appendTerminalLine(l); });
+      } else {
+        appendTerminalLine('<span class="t-line-dim">bash: ' + escapeHtml(parts[0]) + ': command not found (type <span style="color:var(--accent)">help</span> for available commands)</span>');
+      }
+
+      appendTerminalLine(
+        '<span class="t-line-green">stephen@mypka</span><span class="t-line-dim">:</span><span class="t-line-accent">~/Utopia</span><span class="t-line-dim">$</span> '
+      );
+
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (historyIndex < terminalHistory.length - 1) {
+        historyIndex++;
+        document.getElementById('terminalInput').value = terminalHistory[historyIndex];
+      }
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      if (historyIndex > 0) {
+        historyIndex--;
+        document.getElementById('terminalInput').value = terminalHistory[historyIndex];
+      } else {
+        historyIndex = -1;
+        document.getElementById('terminalInput').value = '';
+      }
+    }
+  }
+
+  function appendTerminalLine(html) {
+    var output = document.getElementById('terminalOutput');
+    var div = document.createElement('div');
+    div.innerHTML = html;
+    output.appendChild(div);
+    output.scrollTop = output.scrollHeight;
+  }
+
+  function escapeHtml(str) {
+    return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  // ─────────────────────────────────────────────
+  // GOAL CHECK TOGGLE
+  // ─────────────────────────────────────────────
+  function toggleCheck(el) {
+    el.classList.toggle('done');
+  }
+
+  // ─────────────────────────────────────────────
+  // COPY PATH
+  // ─────────────────────────────────────────────
+  function copyPath() {
+    if (state.currentPath && state.currentFile) {
+      var path = '/home/Stephen/Utopia/' + state.currentPath + '/' + state.currentFile;
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(path).then(function() {
+          var btn = document.getElementById('copyPathBtn');
+          btn.textContent = 'Copied!';
+          setTimeout(function() { btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copy path'; }, 1500);
+        });
+      }
+    }
+  }
+
+  // ─────────────────────────────────────────────
+  // KEYBOARD SHORTCUTS
+  // ─────────────────────────────────────────────
+  document.addEventListener('keydown', function(e) {
+    // Ctrl/Cmd + B = toggle sidebar
+    if ((e.ctrlKey || e.metaKey) && e.key === 'b') {
+      e.preventDefault();
+      document.getElementById('sidebarToggle').click();
+    }
+    // Ctrl/Cmd + ` = toggle terminal
+    if ((e.ctrlKey || e.metaKey) && e.key === '`') {
+      e.preventDefault();
+      toggleTerminal();
+    }
+    // Escape = go home
+    if (e.key === 'Escape' && state.currentFile) {
+      goHome();
+    }
+  });
+</script>
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function() {
+      navigator.serviceWorker.register('./sw.js')
+        .catch(function(err) { console.warn('SW registration failed:', err); });
+    });
+  }
+</script>
+</body>
+</html>

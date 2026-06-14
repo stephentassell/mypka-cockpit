@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192">
+  <rect width="192" height="192" fill="#0d0d1a"/>
+  <rect x="16" y="16" width="160" height="160" rx="24" fill="#13132a"/>
+  <rect x="17" y="17" width="158" height="158" rx="23" fill="none" stroke="#00b4d8" stroke-width="2"/>
+  <text x="96" y="116"
+        font-family="'JetBrains Mono','Fira Code','Cascadia Code','Courier New',monospace"
+        font-size="62"
+        font-weight="700"
+        fill="#00b4d8"
+        text-anchor="middle"
+        dominant-baseline="auto">mP</text>
+  <text x="96" y="148"
+        font-family="system-ui,sans-serif"
+        font-size="18"
+        font-weight="600"
+        fill="#5a5a80"
+        text-anchor="middle"
+        letter-spacing="3">COCKPIT</text>
+</svg>
