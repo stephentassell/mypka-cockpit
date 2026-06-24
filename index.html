@@ -4,9 +4,15 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>myPKA Cockpit — Stephen Tassell</title>
+<!-- GL-003 §3 Lexuria fonts — Playfair Display (headings) + Source Sans 3 (body).
+     Applied to shell chrome layer only (header logo mark, logo text).
+     Felix 2026-06-24. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Source+Sans+3:wght@400;600&display=swap" rel="stylesheet">
 <!-- PWA -->
 <link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#0d0d1a">
+<meta name="theme-color" content="#1B2A4A">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="myPKA">
@@ -26,6 +32,16 @@
 
   /* ── CSS CUSTOM PROPERTIES (dashboard palette) ── */
   :root {
+    /* ── GL-003 §2 Lexuria brand tokens (FIXED, mode-agnostic shell chrome).
+       Same strategy as the Vite cockpit (Felix 2026-06-23): layer over the dark
+       interior, never replace it. Applied ONLY to the header chrome. ── */
+    --lexuria-navy:       #1B2A4A;   /* Primary — Deep Navy */
+    --lexuria-navy-fg:    #F7F3EE;   /* Text on Deep Navy */
+    --lexuria-amber:      #E8A838;   /* Accent — Warm Amber */
+    --lexuria-amber-soft: rgba(232, 168, 56, 0.18); /* Amber hover tint */
+    --font-heading:       'Playfair Display', Georgia, serif;
+    --font-body:          'Source Sans 3', system-ui, sans-serif;
+
     /* Backgrounds */
     --bg-shell:       #0d0d1a;
     --bg-sidebar:     #13132a;
@@ -125,8 +141,9 @@
     align-items: center;
     gap: var(--space-sm);
     padding: 0 var(--space-sm);
-    background: var(--bg-shell);
-    border-bottom: 1px solid var(--border-subtle);
+    /* GL-003 §2 Lexuria shell chrome: Deep Navy header band. Felix 2026-06-24. */
+    background: var(--lexuria-navy);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
     z-index: 20;
     flex-shrink: 0;
   }
@@ -135,7 +152,8 @@
     background: none;
     border: none;
     cursor: pointer;
-    color: var(--text-secondary);
+    /* GL-003: navy bg, so toggle icon uses navy-fg at 70%. Felix 2026-06-24. */
+    color: rgba(247, 243, 238, 0.70);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -147,8 +165,8 @@
   }
 
   .header-toggle:hover {
-    background: var(--accent-dim);
-    color: var(--accent);
+    background: var(--lexuria-amber-soft);
+    color: var(--lexuria-amber);
   }
 
   .header-logo {
@@ -161,34 +179,37 @@
   .header-logo .logo-mark {
     width: 28px;
     height: 28px;
-    background: var(--accent);
+    /* GL-003 §2 Lexuria shell chrome: Warm Amber brand mark. Felix 2026-06-24. */
+    background: var(--lexuria-amber);
     border-radius: var(--radius-sm);
     display: flex;
     align-items: center;
     justify-content: center;
     font-size: 12px;
     font-weight: 700;
-    color: var(--bg-shell);
+    color: #1B2A4A; /* deep navy text on amber mark */
     font-family: var(--font-mono);
   }
 
   .header-logo .logo-text {
     font-size: 15px;
-    font-weight: 600;
-    color: var(--text-heading);
-    letter-spacing: 0.02em;
+    font-weight: 700;
+    /* GL-003 §3 Lexuria shell chrome: Playfair Display brand title. Felix 2026-06-24. */
+    font-family: var(--font-heading);
+    color: var(--lexuria-navy-fg);
+    letter-spacing: 0.01em;
   }
 
   .header-logo .logo-sub {
     font-size: 11px;
-    color: var(--text-muted);
+    color: rgba(247, 243, 238, 0.6); /* --lexuria-navy-fg at 60% */
     font-family: var(--font-mono);
   }
 
   .header-breadcrumb {
     flex: 1;
     font-size: 12px;
-    color: var(--text-muted);
+    color: rgba(247, 243, 238, 0.55); /* navy bg: navy-fg at 55%. Felix 2026-06-24. */
     font-family: var(--font-mono);
     white-space: nowrap;
     overflow: hidden;
@@ -196,12 +217,13 @@
   }
 
   .header-breadcrumb span {
-    color: var(--text-secondary);
+    /* navy bg: secondary text uses navy-fg at 75%. Felix 2026-06-24. */
+    color: rgba(247, 243, 238, 0.75);
   }
 
   .header-breadcrumb .crumb-sep {
     margin: 0 6px;
-    color: var(--text-muted);
+    color: rgba(247, 243, 238, 0.40);
   }
 
   .header-meta {
@@ -213,7 +235,7 @@
 
   .header-date {
     font-size: 12px;
-    color: var(--text-muted);
+    color: rgba(247, 243, 238, 0.55);
     font-family: var(--font-mono);
   }
 
